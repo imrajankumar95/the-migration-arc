@@ -1,6 +1,6 @@
 # The Migration Arc
 
-Multi-cloud container deployment pipeline: from local Docker development to production Kubernetes on AWS — deployed across ECS (Fargate) and EKS.
+Multi-cloud container deployment pipeline: from local Docker development to production Kubernetes on AWS - deployed across ECS (Fargate) and EKS.
 
 ---
 
@@ -93,7 +93,7 @@ the-migration-arc/
 
 ## Phase Details
 
-### Phase 1 — Local Docker (WSL2)
+### Phase 1 - Local Docker (WSL2)
 
 Built and ran the container locally:
 
@@ -104,11 +104,11 @@ curl localhost:5000
 ```
 
 **Key decisions:**
-- Multi-stage Dockerfile — build dependencies stay out of runtime image
+- Multi-stage Dockerfile - build dependencies stay out of runtime image
 - Non-root user (`appuser`) for container security
 - Gunicorn with 2 workers instead of Flask dev server
 
-### Phase 2 — AWS ECS (Fargate)
+### Phase 2 - AWS ECS (Fargate)
 
 Pushed container to ECR, deployed as Fargate task:
 
@@ -120,7 +120,7 @@ Pushed container to ECR, deployed as Fargate task:
 
 **Result:** Flask API accessible via public IP on port 5000.
 
-### Phase 3 — AWS EKS (Kubernetes)
+### Phase 3 - AWS EKS (Kubernetes)
 
 Created managed Kubernetes cluster, deployed as pods:
 
@@ -131,7 +131,7 @@ Created managed Kubernetes cluster, deployed as pods:
 
 **Result:** Flask API running on Kubernetes with load balancing across 2 pods.
 
-### Phase 4 — Azure AKS *(planned)*
+### Phase 4 - Azure AKS *(planned)*
 
 - Push image to Azure Container Registry (ACR)
 - Deploy to Azure Kubernetes Service (AKS)
@@ -143,12 +143,12 @@ Created managed Kubernetes cluster, deployed as pods:
 
 | # | Issue | Root Cause | Fix |
 |---|-------|-----------|-----|
-| 1 | `docker build` failed — "no such file or directory" | Dockerfile is in `./app/`, not root. Build context wrong | Used `make build` which runs `docker build ./app` |
-| 2 | ECS cluster creation failed — "Unable to assume service linked role" | New AWS account, ECS service-linked role did not exist | Ran `aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com` |
-| 3 | ECS cluster creation failed again — CloudFormation stack conflict | First failed attempt left orphaned CloudFormation stack | Deleted failed stack in CloudFormation console, retried with new cluster name |
-| 4 | `eksctl create cluster` — AccessDeniedException | IAM user `rajan-admin` lacked EKS permissions | Added EKS policies + AdministratorAccess |
-| 5 | YAML parse error — "could not find expected ':'" | Mixed tabs and spaces from Windows editor (Notepad) | Recreated YAML files in terminal using heredoc |
-| 6 | Pods stuck in `Pending` — FailedScheduling | `t3.micro` nodes too small — system pods consumed all capacity | Upgraded to `t3.small` nodes via `eksctl create nodegroup` |
+| 1 | `docker build` failed - "no such file or directory" | Dockerfile is in `./app/`, not root. Build context wrong | Used `make build` which runs `docker build ./app` |
+| 2 | ECS cluster creation failed - "Unable to assume service linked role" | New AWS account, ECS service-linked role did not exist | Ran `aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com` |
+| 3 | ECS cluster creation failed again - CloudFormation stack conflict | First failed attempt left orphaned CloudFormation stack | Deleted failed stack in CloudFormation console, retried with new cluster name |
+| 4 | `eksctl create cluster` - AccessDeniedException | IAM user `rajan-admin` lacked EKS permissions | Added EKS policies + AdministratorAccess |
+| 5 | YAML parse error - "could not find expected ':'" | Mixed tabs and spaces from Windows editor (Notepad) | Recreated YAML files in terminal using heredoc |
+| 6 | Pods stuck in `Pending` - FailedScheduling | `t3.micro` nodes too small - system pods consumed all capacity | Upgraded to `t3.small` nodes via `eksctl create nodegroup` |
 
 ---
 
@@ -183,9 +183,9 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 - **Docker multi-stage builds** reduce image size and separate build-time from runtime dependencies
 - **ECS vs EKS tradeoff:** ECS simpler for single containers; EKS worth it when you need scaling, rolling updates, and multi-container orchestration
 - **Fargate** eliminates server management but costs more per unit than EC2
-- **Kubernetes YAML** — indentation matters, never edit with editors that mix tabs/spaces
-- **IAM least privilege** is ideal but impractical for eksctl — it creates VPCs, roles, CloudFormation stacks, and EC2 instances
-- **Node sizing matters** — t3.micro cannot run app pods because AWS system pods consume most capacity
+- **Kubernetes YAML** - indentation matters, never edit with editors that mix tabs/spaces
+- **IAM least privilege** is ideal but impractical for eksctl - it creates VPCs, roles, CloudFormation stacks, and EC2 instances
+- **Node sizing matters** - t3.micro cannot run app pods because AWS system pods consume most capacity
 - **Service-linked roles** are auto-created on first use in established accounts but may need manual creation in new accounts
 
 ---
@@ -209,7 +209,7 @@ make test
 
 ## Author
 
-**Rajan Kumar** — Cloud Computing student at George Brown College, Toronto.
+**Rajan Kumar** - Cloud Computing student at George Brown College, Toronto.
 Building toward a Cloud/DevOps co-op role (Fall 2026).
 
 - [LinkedIn](https://www.linkedin.com/in/imrajankumar95/)
