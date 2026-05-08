@@ -207,6 +207,35 @@ make test
 
 ---
 
+## Deployment Evidence
+
+Infrastructure was deployed, verified working, then torn down to manage costs. Screenshots below serve as proof of successful deployment.
+
+### ECS (Phase 2)
+
+| Screenshot | What It Shows |
+|-----------|---------------|
+| ![ECS Cluster](images/ecs-cluster-running.png) | ECS cluster running on Fargate |
+| ![ECS Service Overview](images/ecs-service-fargate_overview.png) | Fargate service with desired count and running tasks |
+| ![ECS Task](images/ecs-service-fargate_task.png) | Individual Fargate task with public IP assigned |
+| ![ECS Flask Response](images/ecs-flask-response.png) | Flask API responding on ECS public IP:5000 |
+
+### EKS (Phase 3)
+
+| Screenshot | What It Shows |
+|-----------|---------------|
+| ![CloudFormation Stacks](images/cloudformation-stacks.png) | CloudFormation stacks created by eksctl for EKS cluster + node groups |
+
+### Supporting Infrastructure
+
+| Screenshot | What It Shows |
+|-----------|---------------|
+| ![ECR Image](images/ecr-image-pushed.png) | Docker image pushed to ECR private registry |
+| ![IAM Policies](images/iam-policies.png) | IAM user with ECR, ECS, and EKS policies attached |
+| ![Budget Alert](images/budget.png) | $5/month budget alert configured |
+
+---
+
 ## Author
 
 **Rajan Kumar** - Cloud Computing student at George Brown College, Toronto.
