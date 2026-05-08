@@ -1,173 +1,216 @@
 # The Migration Arc
 
-Multi-cloud container deployment pipeline: from local VM development to production-grade Kubernetes on AWS and Azure — provisioned entirely with Terraform.
+Multi-cloud container deployment pipeline: from local Docker development to production Kubernetes on AWS — deployed across ECS (Fargate) and EKS.
 
 ---
 
-## Overview
+## What This Project Does
 
-This project documents a full build-and-deploy journey across four progressive phases, simulating the kind of infrastructure lifecycle you'd encounter in a real DevOps environment:
+Takes a Flask API through four deployment stages, each increasing in complexity:
 
-- **Phase 1 — Local Dev Environment:** Reproducible VM setup using Vagrant + VirtualBox, containerized app with Docker
-- **Phase 2 — AWS Cloud Deployment:** Push container to AWS ECR, deploy to AWS ECS with Terraform-managed infrastructure
-- **Phase 3 — AWS Kubernetes Orchestration:** Local K3s cluster for dev parity, then full AWS EKS deployment via Terraform
-- **Phase 4 — Azure Deployment:** Push image to Azure Container Registry (ACR), deploy to Azure Kubernetes Service (AKS) via Terraform + Azure DevOps CI/CD pipeline
+| Phase | Platform | How It Runs |
+|-------|----------|-------------|
+| **Phase 1** | Local (WSL2) | Docker container on localhost |
+| **Phase 2** | AWS ECS | Fargate serverless container via ECR |
+| **Phase 3** | AWS EKS | Kubernetes pods with LoadBalancer |
+| **Phase 4** | Azure AKS | *(planned)* ACR + AKS + Azure DevOps CI/CD |
 
-Each phase builds on the last. Phase 4 demonstrates the same workload running on both AWS and Azure — true multi-cloud capability using a single Terraform codebase.
+Each phase deploys the **same containerized app** to a progressively more complex environment.
 
 ---
 
 ## Architecture
 
 ```
-Local Dev                AWS                          Azure
-──────────────           ──────────────────────       ──────────────────────────
-Vagrant VM
-  └── Docker ──────────► AWS ECR                      Azure Container Registry
-       └── Nginx              │                                   │
-            App               ▼                                   ▼
-                         AWS ECS (Fargate)             Azure Container Instances
-                              │                                   │
-                              ▼                                   ▼
-                         AWS EKS (Kubernetes)          Azure Kubernetes Service
-                         Terraform-provisioned         Terraform-provisioned
-
-Local K3s ◄────── Dev parity cluster
-
-CI/CD: Azure DevOps Pipeline ──► ACR ──► AKS
+                    ┌─────────────────────────────────┐
+                    │         Flask API (app.py)       │
+                    │    /  /health  /info  /ping      │
+                    └──────────────┬──────────────────┘
+                                   │
+                            Docker Image
+                           (multi-stage build)
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                     │
+        Phase 1: Local       Phase 2: ECS          Phase 3: EKS
+        ──────────────       ─────────────         ─────────────
+        Docker run           ECR → Fargate         ECR → K8s Pods
+        localhost:5000       Public IP:5000        LoadBalancer:80
+                             1 task, 0.25 vCPU     2 replicas
+                             0.5 GB RAM            t3.small nodes
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | AWS | Azure |
-|---|---|---|
-| Container Registry | AWS ECR | Azure Container Registry (ACR) |
-| Container Orchestration | AWS ECS (Fargate) | Azure Container Instances |
-| Kubernetes | AWS EKS | Azure Kubernetes Service (AKS) |
-| Infrastructure as Code | Terraform | Terraform |
-| CI/CD Pipeline | — | Azure DevOps |
-| Local VM | Vagrant + VirtualBox | — |
-| Local Kubernetes | K3s | — |
-| Web Server | Nginx | Nginx |
+| Tool | Purpose |
+|------|---------|
+| **Flask** | Python API (5 endpoints) |
+| **Docker** | Multi-stage container build |
+| **Gunicorn** | Production WSGI server |
+| **GitHub Actions** | CI: lint, test, build, push to GHCR |
+| **AWS ECR** | Private container registry |
+| **AWS ECS (Fargate)** | Serverless container deployment |
+| **AWS EKS** | Managed Kubernetes cluster |
+| **kubectl** | Kubernetes deployment management |
+| **eksctl** | EKS cluster provisioning |
 
 ---
 
-## Project Phases
-
-### Phase 1 — Local Environment Setup ✅
-- Vagrant + VirtualBox provisioning a Ubuntu VM
-- Dockerized Nginx app running inside the VM
-- Reproducible local dev setup via `Vagrantfile`
-
-### Phase 2 — AWS Cloud Deployment ✅
-- Docker image tagged and pushed to **AWS ECR**
-- ECS task definition and service deployed via **Terraform**
-- App running on AWS Fargate (serverless containers)
-
-### Phase 3 — AWS Kubernetes Orchestration 🔄 In Progress
-- Local **K3s** cluster for Kubernetes dev parity
-- Full **AWS EKS** cluster provisioned with Terraform
-- App deployed as Kubernetes workload on EKS
-
-### Phase 4 — Azure Deployment 📋 Planned
-- Docker image pushed to **Azure Container Registry (ACR)**
-- **Azure Kubernetes Service (AKS)** cluster provisioned with Terraform
-- **Azure DevOps Pipeline** — CI/CD: build → push to ACR → deploy to AKS
-- Side-by-side comparison: same app running on EKS (AWS) and AKS (Azure)
-
----
-
-## Repository Structure
+## Project Structure
 
 ```
 the-migration-arc/
-├── Vagrantfile                  # Local VM provisioning
-├── docker/
-│   ├── Dockerfile               # App container definition
-│   └── nginx.conf               # Nginx config
-├── terraform/
-│   ├── ecr/                     # AWS ECR repository
-│   ├── ecs/                     # AWS ECS cluster, task def, service
-│   ├── eks/                     # AWS EKS cluster and node groups
-│   ├── acr/                     # Azure Container Registry
-│   └── aks/                     # Azure Kubernetes Service cluster
+├── app/
+│   ├── app.py              # Flask API (5 routes)
+│   ├── Dockerfile          # Multi-stage build (builder + runtime)
+│   └── requirements.txt    # flask + gunicorn
 ├── k8s/
-│   ├── aws/
-│   │   └── deployment.yaml      # EKS Kubernetes manifests
-│   └── azure/
-│       └── deployment.yaml      # AKS Kubernetes manifests
-├── azure-pipelines/
-│   └── azure-pipelines.yml      # Azure DevOps CI/CD pipeline
-└── scripts/
-    ├── build-push-aws.sh        # Docker build + ECR push
-    ├── build-push-azure.sh      # Docker build + ACR push
-    └── deploy.sh                # Terraform apply wrapper
+│   ├── deployment.yaml     # Kubernetes Deployment (2 replicas)
+│   └── service.yaml        # LoadBalancer Service (80 → 5000)
+├── tests/
+│   └── test_app.py         # 5 unit tests (pytest)
+├── .github/workflows/
+│   └── ci.yml              # CI: lint → test → build → push to GHCR
+├── Makefile                # Local dev commands (build/run/stop/test)
+└── README.md
 ```
 
 ---
 
-## Prerequisites
+## API Endpoints
 
-- [Vagrant](https://www.vagrantup.com/) + [VirtualBox](https://www.virtualbox.org/)
-- [Docker](https://www.docker.com/)
-- [Terraform](https://www.terraform.io/) >= 1.5
-- [AWS CLI](https://aws.amazon.com/cli/) configured with IAM permissions
-- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) configured with subscription access
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) + [K3s](https://k3s.io/) (Phase 3 local)
-- Azure DevOps account (Phase 4 CI/CD)
+| Route | Response |
+|-------|----------|
+| `GET /` | Service name, status, message |
+| `GET /health` | Health check with UTC timestamp |
+| `GET /info` | Hostname, OS, Python version, app version |
+| `GET /ping` | `{"pong": true}` |
+| `GET /metrics/custom` | Request count, uptime, environment |
 
 ---
 
-## Quick Start
+## Phase Details
 
-### Phase 1 — Run locally
+### Phase 1 — Local Docker (WSL2)
+
+Built and ran the container locally:
+
+```bash
+make build        # docker build -t migration-arc-app:local ./app
+make run          # docker run --rm -p 5000:5000 migration-arc-app:local
+curl localhost:5000
+```
+
+**Key decisions:**
+- Multi-stage Dockerfile — build dependencies stay out of runtime image
+- Non-root user (`appuser`) for container security
+- Gunicorn with 2 workers instead of Flask dev server
+
+### Phase 2 — AWS ECS (Fargate)
+
+Pushed container to ECR, deployed as Fargate task:
+
+1. Created private ECR repo (`migration-arc-flask`)
+2. Authenticated Docker to ECR, tagged and pushed image
+3. Created ECS cluster (`migration-arc-project-cluster`)
+4. Defined task (0.25 vCPU, 0.5 GB, port 5000)
+5. Created service with public IP + security group (TCP 5000 open)
+
+**Result:** Flask API accessible via public IP on port 5000.
+
+### Phase 3 — AWS EKS (Kubernetes)
+
+Created managed Kubernetes cluster, deployed as pods:
+
+1. Provisioned EKS cluster with `eksctl` (2x t3.small nodes)
+2. Created Deployment (2 replicas pulling from ECR)
+3. Created LoadBalancer Service (port 80 → container 5000)
+4. App accessible via AWS ELB URL
+
+**Result:** Flask API running on Kubernetes with load balancing across 2 pods.
+
+### Phase 4 — Azure AKS *(planned)*
+
+- Push image to Azure Container Registry (ACR)
+- Deploy to Azure Kubernetes Service (AKS)
+- CI/CD via Azure DevOps pipeline
+
+---
+
+## Issues & Solutions
+
+| # | Issue | Root Cause | Fix |
+|---|-------|-----------|-----|
+| 1 | `docker build` failed — "no such file or directory" | Dockerfile is in `./app/`, not root. Build context wrong | Used `make build` which runs `docker build ./app` |
+| 2 | ECS cluster creation failed — "Unable to assume service linked role" | New AWS account, ECS service-linked role did not exist | Ran `aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com` |
+| 3 | ECS cluster creation failed again — CloudFormation stack conflict | First failed attempt left orphaned CloudFormation stack | Deleted failed stack in CloudFormation console, retried with new cluster name |
+| 4 | `eksctl create cluster` — AccessDeniedException | IAM user `rajan-admin` lacked EKS permissions | Added EKS policies + AdministratorAccess |
+| 5 | YAML parse error — "could not find expected ':'" | Mixed tabs and spaces from Windows editor (Notepad) | Recreated YAML files in terminal using heredoc |
+| 6 | Pods stuck in `Pending` — FailedScheduling | `t3.micro` nodes too small — system pods consumed all capacity | Upgraded to `t3.small` nodes via `eksctl create nodegroup` |
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions workflow (`.github/workflows/ci.yml`):
+
+1. **On push/PR to main:** Lint with flake8 → Run 5 pytest tests
+2. **On merge to main:** Build Docker image → Push to GitHub Container Registry (GHCR)
+3. Uses Docker layer caching for fast builds
+
+---
+
+## Cost Notes
+
+| Resource | Cost (24/7) | Notes |
+|----------|------------|-------|
+| ECS Fargate (0.25 vCPU) | ~$9/month | Serverless, pay per task |
+| EKS control plane | $72/month | Fixed cost regardless of nodes |
+| EKS nodes (2x t3.small) | ~$30/month | EC2 instances |
+| EKS LoadBalancer | ~$18/month | AWS NLB/ALB |
+| ECR storage | ~$0.01/month | Just image storage |
+| **Total (all live)** | **~$129/month** | |
+| **After cleanup** | **~$0.01/month** | Only ECR repo kept |
+
+> Infrastructure was deployed for demonstration, verified working, then torn down to manage costs. Screenshots and deployment evidence in commit history.
+
+---
+
+## What I Learned
+
+- **Docker multi-stage builds** reduce image size and separate build-time from runtime dependencies
+- **ECS vs EKS tradeoff:** ECS simpler for single containers; EKS worth it when you need scaling, rolling updates, and multi-container orchestration
+- **Fargate** eliminates server management but costs more per unit than EC2
+- **Kubernetes YAML** — indentation matters, never edit with editors that mix tabs/spaces
+- **IAM least privilege** is ideal but impractical for eksctl — it creates VPCs, roles, CloudFormation stacks, and EC2 instances
+- **Node sizing matters** — t3.micro cannot run app pods because AWS system pods consume most capacity
+- **Service-linked roles** are auto-created on first use in established accounts but may need manual creation in new accounts
+
+---
+
+## How to Run Locally
+
 ```bash
 git clone https://github.com/imrajankumar95/the-migration-arc.git
 cd the-migration-arc
-vagrant up
-# App running inside VM via Docker + Nginx
+make build
+make run
+# Visit http://localhost:5000
 ```
 
-### Phase 2 — Deploy to AWS ECS
+Run tests:
 ```bash
-aws ecr get-login-password --region ca-central-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.ca-central-1.amazonaws.com
-bash scripts/build-push-aws.sh
-cd terraform/ecs && terraform init && terraform apply
-```
-
-### Phase 3 — Deploy to AWS EKS
-```bash
-cd terraform/eks && terraform init && terraform apply
-aws eks update-kubeconfig --name migration-arc-cluster --region ca-central-1
-kubectl apply -f k8s/aws/deployment.yaml
-```
-
-### Phase 4 — Deploy to Azure AKS
-```bash
-az login
-az acr login --name migrationarcacr
-bash scripts/build-push-azure.sh
-cd terraform/aks && terraform init && terraform apply
-az aks get-credentials --resource-group migration-arc-rg --name migration-arc-aks
-kubectl apply -f k8s/azure/deployment.yaml
+make test
 ```
 
 ---
 
-## Related Projects
+## Author
 
-- **[infrastructure-monitoring](https://github.com/imrajankumar95/infrastructure-monitoring)** — Prometheus + Grafana observability stack that monitors this app's health metrics and triggers alerts via Slack and email.
+**Rajan Kumar** — Cloud Computing student at George Brown College, Toronto.
+Building toward a Cloud/DevOps co-op role (Fall 2026).
 
----
-
-## Status
-
-| Phase | Description | Status |
-|---|---|---|
-| Phase 1 | Local Dev — Vagrant + Docker | ✅ Complete |
-| Phase 2 | AWS ECS via Terraform | ✅ Complete |
-| Phase 3 | AWS K3s + EKS | 🔄 In Progress |
-| Phase 4 | Azure ACR + AKS + Azure DevOps | 📋 Planned |
-| Observability | Prometheus + Grafana integration | 🔄 In Progress |
+- [LinkedIn](https://www.linkedin.com/in/imrajankumar95/)
+- [GitHub](https://github.com/imrajankumar95)
